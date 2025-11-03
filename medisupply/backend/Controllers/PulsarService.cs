@@ -3,6 +3,7 @@ using backend.Dto;
 using Pulsar.Client.Api;
 using System.Text;
 using System.Text.Json;
+using System.Web;
 
 namespace backend.Controllers
 {
@@ -60,14 +61,39 @@ namespace backend.Controllers
 
                     try
                     {
-                        // Intenta deserializar el JSON
-                        var solicitud = JsonSerializer.Deserialize<SolicitudProveedorDto>(contenido);
+                        // 🔹 Paso 1: Decodificar el texto URL (x-www-form-urlencoded)
+                        string decoded = HttpUtility.UrlDecode(contenido);
 
-                        Console.WriteLine($"✅ Producto: {solicitud?.productID}, Stock: {solicitud?.stock}");
+                        // 🔹 Paso 2: Extraer el parámetro 'content={...}'
+                        int start = decoded.IndexOf("content=");
+
+                        if (start >= 0)
+                        {
+                            string contentJson = decoded.Substring(start + 8); // Salta 'content='
+                            int end = contentJson.IndexOf("&");
+                            if (end > 0)
+                                contentJson = contentJson.Substring(0, end);
+
+                            // 🔹 Paso 3: Parsear el JSON interno {"content": {...}}
+                            using var doc = JsonDocument.Parse(contentJson);
+                            if (doc.RootElement.TryGetProperty("content", out var inner))
+                            {
+                                var solicitud = JsonSerializer.Deserialize<SolicitudProveedorDto>(inner.ToString());
+                                Console.WriteLine($"✅ Producto: {solicitud?.productID}, Stock: {solicitud?.stock}");
+                            }
+                            else
+                            {
+                                Console.WriteLine("⚠️ No se encontró el campo 'content' en el JSON.");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("⚠️ No se encontró el parámetro 'content=' en el mensaje.");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"⚠️ No se pudo parsear el mensaje como JSON: {ex.Message}");
+                        Console.WriteLine($"⚠️ Error al parsear mensaje: {ex.Message}");
                     }
 
                     await consumer.AcknowledgeAsync(msg.MessageId);
