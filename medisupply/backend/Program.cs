@@ -21,6 +21,10 @@ builder.Services.AddSingleton(sp =>
     sp.GetRequiredService<IOptions<PulsarSettings>>().Value
 );
 
+builder.Services.AddSingleton(sp =>
+    sp.GetRequiredService<IOptions<KafkaSettings>>().Value
+);
+
 
 
 builder.Services.AddSingleton<PulsarService>();
