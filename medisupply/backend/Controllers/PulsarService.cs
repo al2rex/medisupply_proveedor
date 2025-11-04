@@ -1,5 +1,6 @@
 ﻿using backend.Config;
 using backend.Dto;
+using Confluent.Kafka;
 using Pulsar.Client.Api;
 using System.Text;
 using System.Text.Json;
@@ -13,15 +14,29 @@ namespace backend.Controllers
         
         private readonly PulsarSettings _settings;
 
-        public PulsarService(PulsarSettings settings)
+        private readonly KafkaSettings _kafkaSettings;
+
+        private readonly IProducer<Null, string> _kafkaProducer;
+
+        public PulsarService(PulsarSettings settings, KafkaSettings kafkaSettings)
         {
             _settings = settings;
+            _kafkaSettings = kafkaSettings;
+
             _client = new PulsarClientBuilder()
                 .ServiceUrl(_settings.BrokerUrl)
                 .BuildAsync()
                 .GetAwaiter()
                 .GetResult();
             Console.WriteLine($"✅ Pulsar conectado a: {_settings.BrokerUrl}");
+
+            var config = new ProducerConfig
+            {
+                BootstrapServers = _kafkaSettings?.BootstrapServers ?? "localhost:9092"
+            };
+
+            _kafkaProducer = new ProducerBuilder<Null, string>(config).Build();
+            Console.WriteLine($"✅ Kafka configurado en: {_kafkaSettings.BootstrapServers}");
         }
 
         public async Task PublicarInventarioRecibidoAsync(string mensaje)
@@ -80,6 +95,13 @@ namespace backend.Controllers
                             {
                                 var solicitud = JsonSerializer.Deserialize<SolicitudProveedorDto>(inner.ToString());
                                 Console.WriteLine($"✅ Producto: {solicitud?.productID}, Stock: {solicitud?.stock}");
+
+                                // 🔹 Publicar en Kafka
+                                var kafkaTopic = _kafkaSettings.Topic;
+                                var kafkaMessage = JsonSerializer.Serialize(solicitud);
+
+                                await _kafkaProducer.ProduceAsync(kafkaTopic, new Message<Null, string> { Value = kafkaMessage });
+                                Console.WriteLine($"📤 Publicado en Kafka ({kafkaTopic}): {kafkaMessage}");
                             }
                             else
                             {
@@ -101,7 +123,5 @@ namespace backend.Controllers
             });
         }
     }
-
- 
 }
 
