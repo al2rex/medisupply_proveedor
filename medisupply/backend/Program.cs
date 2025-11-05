@@ -16,6 +16,10 @@ builder.Services.Configure<PulsarSettings>(
     builder.Configuration.GetSection("PulsarSettings")
 );
 
+builder.Services.Configure<KafkaSettings>(
+    builder.Configuration.GetSection("KafkaSettings")
+);
+
 // Registrar como singleton directo
 builder.Services.AddSingleton(sp =>
     sp.GetRequiredService<IOptions<PulsarSettings>>().Value

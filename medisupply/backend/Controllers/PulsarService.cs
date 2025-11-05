@@ -97,11 +97,26 @@ namespace backend.Controllers
                                 Console.WriteLine($"✅ Producto: {solicitud?.productID}, Stock: {solicitud?.stock}");
 
                                 // 🔹 Publicar en Kafka
-                                var kafkaTopic = _kafkaSettings.Topic;
-                                var kafkaMessage = JsonSerializer.Serialize(solicitud);
+                                try
+                                {
+                                    var kafkaTopic = _kafkaSettings.Topic;
+                                    var kafkaMessage = JsonSerializer.Serialize(solicitud);
 
-                                await _kafkaProducer.ProduceAsync(kafkaTopic, new Message<Null, string> { Value = kafkaMessage });
-                                Console.WriteLine($"📤 Publicado en Kafka ({kafkaTopic}): {kafkaMessage}");
+                                    var deliveryResult = await _kafkaProducer.ProduceAsync(
+                                        kafkaTopic,
+                                        new Message<Null, string> { Value = kafkaMessage }
+                                    );
+
+                                    Console.WriteLine($"📤 Publicado en Kafka ({kafkaTopic}) [Partition: {deliveryResult.Partition}, Offset: {deliveryResult.Offset}] => {kafkaMessage}");
+                                }
+                                catch (ProduceException<Null, string> ex)
+                                {
+                                    Console.WriteLine($"❌ Error publicando en Kafka: {ex.Error.Reason}");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"❌ Excepción inesperada publicando en Kafka: {ex.Message}");
+                                }
                             }
                             else
                             {
